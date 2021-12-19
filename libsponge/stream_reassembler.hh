@@ -3,9 +3,10 @@
 
 #include "byte_stream.hh"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
-
+#include <vector>
 //! \brief A class that assembles a series of excerpts from a byte stream (possibly out of order,
 //! possibly overlapping) into an in-order byte stream.
 class StreamReassembler {
@@ -14,6 +15,25 @@ class StreamReassembler {
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
+    class ReassemblerNode {
+      public:
+        size_t begin;
+        size_t end;
+        std::string data;
+        ReassemblerNode(const size_t b, const size_t e, const std::string d) : begin(b), end(e), data(d){};
+        ReassemblerNode() : begin(0), end(0), data(){};
+        bool operator<(const ReassemblerNode &d) {
+            if (begin == d.begin) {
+                return end < d.end;
+            }
+            return begin < d.begin;
+        };
+    };
+    std::vector<ReassemblerNode> nodes;
+    size_t size;
+    size_t current_begin;
+    size_t eof_pos;
+    void PushAndCombine(const size_t index, const std::string &data);
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
@@ -29,7 +49,7 @@ class StreamReassembler {
     //! \param data the substring
     //! \param index indicates the index (place in sequence) of the first byte in `data`
     //! \param eof the last byte of `data` will be the last byte in the entire stream
-    void push_substring(const std::string &data, const uint64_t index, const bool eof);
+    void push_substring(const std::string &data, const size_t index, const bool eof);
 
     //! \name Access the reassembled byte stream
     //!@{
