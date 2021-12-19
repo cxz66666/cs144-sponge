@@ -102,7 +102,7 @@ void UDPSocket::recv(received_datagram &datagram, const size_t mtu) {
     }
 
     register_read();
-    datagram.source_address = {datagram_source_address, fromlen};
+    datagram.source_address = {datagram_source_address, static_cast<size_t>(fromlen)};
     datagram.payload.resize(recv_len);
 }
 

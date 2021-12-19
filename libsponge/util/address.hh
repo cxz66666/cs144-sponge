@@ -36,7 +36,7 @@ class Address {
     Address(const std::string &ip, const std::uint16_t port = 0);
 
     //! Construct from a [sockaddr *](@ref man7::socket).
-    Address(const sockaddr *addr, const std::size_t size);
+    Address(const sockaddr *addr, const size_t size);
 
     //! Equality comparison.
     bool operator==(const Address &other) const;
