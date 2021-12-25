@@ -2,7 +2,7 @@
 #define SPONGE_LIBSPONGE_WRAPPING_INTEGERS_HH
 
 #include <cstdint>
-#include <ostream>
+#include <iostream>
 
 //! \brief A 32-bit integer, expressed relative to an arbitrary initial sequence number (ISN)
 //! \note This is used to express TCP sequence numbers (seqno) and acknowledgment numbers (ackno)
