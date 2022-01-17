@@ -25,12 +25,39 @@ class TCPSender {
 
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
+    // RTO
+    unsigned int _retransmission_timeout;
+    // now time after start RTO clock
+    unsigned int _now_retransmission_timeout;
+    // whether begin TIMER
+    bool start_rto{false};
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+
+    // the already received ack number
+    uint64_t _ack_seqno{0};
+
+    //  like its name, when size is 0, it will act like 1
+    uint64_t windows_size{0};
+
+    // internal node for not acked data
+    struct TCPSenderOutstanding {
+        std::string data;
+        uint64_t seqno;
+        uint64_t size;
+        bool syn;
+        bool fin;
+        bool operator<(const TCPSenderOutstanding &b) { return seqno < b.seqno; }
+    };
+    // store the internal node
+    std::vector<TCPSenderOutstanding> _outstanding_node{};
+
+    // number for retransmission
+    unsigned int retransmission_count{0};
 
   public:
     //! Initialize a TCPSender
@@ -66,7 +93,7 @@ class TCPSender {
     //! \brief How many sequence numbers are occupied by segments sent but not yet acknowledged?
     //! \note count is in "sequence space," i.e. SYN and FIN each count for one byte
     //! (see TCPSegment::length_in_sequence_space())
-    size_t bytes_in_flight() const;
+    uint64_t bytes_in_flight() const;
 
     //! \brief Number of consecutive retransmissions that have occurred in a row
     unsigned int consecutive_retransmissions() const;
@@ -87,6 +114,14 @@ class TCPSender {
     //! \brief relative seqno for the next byte to be sent
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
+
+    // every time we send segment, we call this function to start clock
+    void start_rto_clock() {
+        if (!start_rto) {
+            start_rto = true;
+            _now_retransmission_timeout = 0;
+        }
+    }
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH

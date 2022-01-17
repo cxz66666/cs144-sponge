@@ -13,14 +13,13 @@ ByteStream::ByteStream(const size_t capacity)
     : cap(capacity), left_size(0), data_left(), _eoi(false), read_bytes(0), write_bytes(0) {}
 
 size_t ByteStream::write(const string &data) {
-    size_t now = 0;
-    size_t tmp = min(data.size() - now, cap - left_size);
-    data_left.append(data.begin() + now, data.begin() + now + tmp);
-    now += tmp;
-    left_size += tmp;
+    size_t length = min(static_cast<size_t>(data.size()), cap - left_size);
+    data_left.append(data.begin(), data.begin() + length);
 
-    write_bytes += now;
-    return now;
+    left_size += length;
+
+    write_bytes += length;
+    return length;
 }
 
 //! \param[in] len bytes will be copied from the output side of the buffer

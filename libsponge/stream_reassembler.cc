@@ -27,15 +27,22 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     if (end <= current_begin) {
         return;
     }
-    // data_index_begin是已经accept的部分的长度
+    // accepted_size是已经accept的部分的长度,就是当前accept的index已经超过了该部分
     size_t accepted_size = 0;
     if (index < current_begin) {
         accepted_size = current_begin - index;
     }
-    //三个里面的最小值， 可以容纳的大小，剩余字符串长度，以及在不超过cap的情况下最长可以放的字符串长度
-    // target_size实际上是目标字符串的长度
-    size_t target_size = min(_output.remaining_capacity() - size, static_cast<size_t>(data.size()) - accepted_size);
-    target_size = min(target_size, _capacity + _output.bytes_read() - index - accepted_size);
+
+    //思考了一下，感觉是两个里面的最小值，接收窗口-开始的index，以及还未接受的剩余字符串的长度
+     size_t target_size = min(static_cast<size_t>(data.size()) - accepted_size, _capacity + _output.bytes_read() - index - accepted_size);
+
+
+     //三个里面的最小值， 可以容纳的大小，剩余字符串长度，以及在不超过cap的情况下最长可以放的字符串长度
+     // target_size实际上是目标字符串的长度
+//    size_t target_size = min(_output.remaining_capacity() - size, static_cast<size_t>(data.size()) - accepted_size);
+//    target_size = min(target_size, _capacity + _output.bytes_read() - index - accepted_size);
+
+
     if (!target_size) {
         return;
     }
