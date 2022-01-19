@@ -21,13 +21,7 @@ TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const s
     , _now_retransmission_timeout{0}
     , _stream(capacity) {}
 
-uint64_t TCPSender::bytes_in_flight() const {
-    uint64_t ans = 0;
-    for (auto &m : _outstanding_node) {
-        ans += m.size;
-    }
-    return ans;
-}
+uint64_t TCPSender::bytes_in_flight() const { return _next_seqno - _ack_seqno; }
 
 void TCPSender::fill_window() {
     TCPSegment segment;
@@ -41,9 +35,8 @@ void TCPSender::fill_window() {
         segment.header().seqno = wrap(_next_seqno, _isn);
         segment.header().fin = true;
         _segments_out.push(segment);
-        _outstanding_node.push_back(
-            TCPSenderOutstanding{data, _next_seqno, 1, segment.header().syn, segment.header().fin});
-        _next_seqno++;
+        _outstanding_node.push(segment);
+        _next_seqno += segment.length_in_sequence_space();
         return;
         //如果FIN已经发送完了，也就是啥都不用发送了，直接返回
     } else if (_stream.eof() && _next_seqno == _stream.bytes_written() + 2) {
@@ -58,7 +51,7 @@ void TCPSender::fill_window() {
     //如果窗口大小为0
     if (!windows_size) {
         //如果已经发送过东西了（1 byte），则不能再发送了，
-        if (_outstanding_node.size()) {
+        if (!_outstanding_node.empty()) {
             return;
         }
         this->start_rto_clock();
@@ -73,9 +66,8 @@ void TCPSender::fill_window() {
             data = segment.payload().copy();
         }
         _segments_out.push(segment);
-        _outstanding_node.push_back(
-            TCPSenderOutstanding{data, _next_seqno, 1, segment.header().syn, segment.header().fin});
-        _next_seqno += 1;
+        _outstanding_node.push(segment);
+        _next_seqno += segment.length_in_sequence_space();
 
     } else {
         uint64_t flight_bytes = this->bytes_in_flight();
@@ -86,20 +78,16 @@ void TCPSender::fill_window() {
             s.payload() = Buffer(
                 _stream.read(min(TCPConfig::MAX_PAYLOAD_SIZE, static_cast<size_t>(windows_size - flight_bytes))));
 
-            //            cout << s.payload().size() << endl;
-            uint64_t size = s.payload().size();
             //得看看有没有FIN信号的位置，这里要注意一点，就是size可以等于TCPConfig::MAX_PAYLOAD_SIZE，因为本来就不占用payload
             // size，但是不能超过windows size，因为FIN占用一个windows size
-            if (_stream.eof() && size < static_cast<size_t>(windows_size - flight_bytes)) {
-                size++;
+            if (_stream.eof() && s.length_in_sequence_space() < static_cast<size_t>(windows_size - flight_bytes)) {
                 s.header().fin = true;
             }
             s.header().seqno = wrap(_next_seqno, _isn);
             _segments_out.push(s);
-            _outstanding_node.push_back(
-                TCPSenderOutstanding{s.payload().copy(), _next_seqno, size, s.header().syn, s.header().fin});
-            _next_seqno += size;
-            flight_bytes += size;
+            _outstanding_node.push(s);
+            _next_seqno += s.length_in_sequence_space();
+            flight_bytes += s.length_in_sequence_space();
         }
     }
 }
@@ -122,15 +110,18 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     windows_size = window_size;
     _retransmission_timeout = _initial_retransmission_timeout;
     retransmission_count = 0;
-    for (auto m = _outstanding_node.begin(); m != _outstanding_node.end();) {
-        if (m->seqno + m->size <= _ack_seqno) {
-            m = _outstanding_node.erase(m);
+
+    while (!_outstanding_node.empty()) {
+        TCPSegment &tmp = _outstanding_node.front();
+        if (unwrap(tmp.header().seqno, _isn, _stream.bytes_read()) + tmp.length_in_sequence_space() <= _ack_seqno) {
+            _outstanding_node.pop();
         } else {
-            m++;
+            break;
         }
     }
+
     //判断还有没有等待的，如果有则将超时置为0，没有则将flag置为false
-    if (_outstanding_node.size()) {
+    if (!_outstanding_node.empty()) {
         _now_retransmission_timeout = 0;
     } else {
         start_rto = false;
@@ -147,20 +138,12 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
     if (_now_retransmission_timeout < _retransmission_timeout || !_outstanding_node.size()) {
         return;
     }
-    sort(_outstanding_node.begin(), _outstanding_node.end());
-    TCPSegment segment;
-    segment.header().syn = _outstanding_node[0].syn;
-    segment.header().fin = _outstanding_node[0].fin;
-    segment.header().seqno = wrap(_outstanding_node[0].seqno, _isn);
-    //这里先把右值给segment，然后再从segment中copy一份
-    segment.payload() = Buffer(move(_outstanding_node[0].data));
-    _outstanding_node[0].data = segment.payload().copy();
 
     this->start_rto_clock();
-    _segments_out.push(segment);
+    _segments_out.push(_outstanding_node.front());
 
     //如果是重发SYN帧，或者之后的windows_size不为0
-    if (windows_size || _outstanding_node[0].syn) {
+    if (windows_size || _outstanding_node.front().header().syn) {
         retransmission_count++;
         _retransmission_timeout *= 2;
     }

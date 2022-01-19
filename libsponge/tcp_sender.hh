@@ -22,7 +22,8 @@ class TCPSender {
 
     //! outbound queue of segments that the TCPSender wants sent
     std::queue<TCPSegment> _segments_out{};
-
+    // store the internal node
+    std::queue<TCPSegment> _outstanding_node{};
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
     // RTO
@@ -53,8 +54,6 @@ class TCPSender {
         bool fin;
         bool operator<(const TCPSenderOutstanding &b) { return seqno < b.seqno; }
     };
-    // store the internal node
-    std::vector<TCPSenderOutstanding> _outstanding_node{};
 
     // number for retransmission
     unsigned int retransmission_count{0};
