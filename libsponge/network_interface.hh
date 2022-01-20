@@ -1,10 +1,12 @@
 #ifndef SPONGE_LIBSPONGE_NETWORK_INTERFACE_HH
 #define SPONGE_LIBSPONGE_NETWORK_INTERFACE_HH
 
+#include "arp_message.hh"
 #include "ethernet_frame.hh"
 #include "tcp_over_ip.hh"
 #include "tun.hh"
 
+#include <map>
 #include <optional>
 #include <queue>
 
@@ -39,6 +41,33 @@ class NetworkInterface {
 
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
+    // store the wait arp response packet
+    std::vector<std::pair<InternetDatagram, uint32_t>> _frame_pending_out{};
+
+    // arp cache expired time
+    static constexpr size_t expired_time = 30000;
+
+    // resend arp request for same IPV4 address
+    static constexpr size_t retx_waiting_time = 5000;
+
+    // now time
+    size_t now_time_ms{0};
+
+    // struct for store arp cache
+    struct ARPCache {
+        EthernetAddress ethernet_address;
+        uint32_t ip_address;
+        size_t created_time;
+    };
+    std::vector<ARPCache> cache{};
+
+    // key is IP, value is last send ARP request for this IP
+    std::map<uint32_t, size_t> last_retx_time{};
+
+    void send_arp_request(uint32_t next_hop_ip);
+
+    void send_arp_reply( EthernetAddress &dst,uint32_t dst_ip);
+    void send_ipv4(const InternetDatagram &dgram, EthernetAddress &dst);
 
   public:
     //! \brief Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer) addresses
