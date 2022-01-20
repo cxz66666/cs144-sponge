@@ -65,8 +65,7 @@ class NetworkInterface {
     std::map<uint32_t, size_t> last_retx_time{};
 
     void send_arp_request(uint32_t next_hop_ip);
-
-    void send_arp_reply( EthernetAddress &dst,uint32_t dst_ip);
+    void send_arp_reply(EthernetAddress &dst, uint32_t dst_ip);
     void send_ipv4(const InternetDatagram &dgram, EthernetAddress &dst);
 
   public:
