@@ -29,9 +29,10 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
     // convert IP address of next hop to raw 32-bit representation (used in ARP header)
     const uint32_t next_hop_ip = next_hop.ipv4_numeric();
 
+    //查找下一跳mac地址是否存在
     auto cache_item = find_if(
         cache.begin(), cache.end(), [&](const ARPCache &item) -> bool { return item.ip_address == next_hop_ip; });
-    EthernetFrame frame;
+
     if (cache_item == cache.end()) {
         auto pending_item =
             find_if(_frame_pending_out.begin(),
@@ -41,16 +42,17 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
         //如果已经有人在等了,同时没有超时
         if (pending_item != _frame_pending_out.end() && last_retx_time[next_hop_ip] + retx_waiting_time > now_time_ms) {
             //无论有没有人在等，自己都得进队列
-            _frame_pending_out.push_back({dgram, next_hop_ip});
+            _frame_pending_out.emplace_back(dgram, next_hop_ip);
             return;
         }
-        _frame_pending_out.push_back({dgram, next_hop_ip});
+        _frame_pending_out.emplace_back(dgram, next_hop_ip);
 
         //没人等，发送arp
         send_arp_request(next_hop_ip);
         //记录发送arp的时间
         last_retx_time[next_hop_ip] = now_time_ms;
     } else {
+        //直接发包
         send_ipv4(dgram, cache_item->ethernet_address);
     }
 }
@@ -84,7 +86,7 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
                 cache.push_back(
                     ARPCache{arpMessage.sender_ethernet_address, arpMessage.sender_ip_address, now_time_ms});
             }
-            //发送回复
+            //发送回复（request type 同时 target ip是自己的）
             if (arpMessage.opcode == ARPMessage::OPCODE_REQUEST &&
                 arpMessage.target_ip_address == _ip_address.ipv4_numeric()) {
                 send_arp_reply(arpMessage.sender_ethernet_address, arpMessage.sender_ip_address);
@@ -106,6 +108,7 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick(const size_t ms_since_last_tick) {
     now_time_ms += ms_since_last_tick;
+    //删除arpcache
     for (auto m = cache.begin(); m != cache.end();) {
         if (m->created_time + expired_time <= now_time_ms) {
             m = cache.erase(m);

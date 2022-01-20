@@ -17,7 +17,6 @@ size_t ByteStream::write(const string &data) {
     data_left.append(data.begin(), data.begin() + length);
 
     left_size += length;
-
     write_bytes += length;
     return length;
 }

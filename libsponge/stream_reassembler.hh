@@ -22,7 +22,7 @@ class StreamReassembler {
         std::string data;
         ReassemblerNode(const size_t b, const size_t e, const std::string d) : begin(b), end(e), data(d){};
         ReassemblerNode() : begin(0), end(0), data(){};
-        bool operator<(const ReassemblerNode &d) {
+        bool operator<(const ReassemblerNode &d) const {
             if (begin == d.begin) {
                 return end < d.end;
             }
@@ -30,7 +30,7 @@ class StreamReassembler {
         };
     };
     std::vector<ReassemblerNode> nodes;
-    size_t size;
+    size_t unassembled_size;
     size_t current_begin;
     size_t eof_pos;
     void PushAndCombine(const size_t index, const std::string &data);

@@ -70,30 +70,29 @@ void TCPSender::fill_window() {
         _next_seqno += segment.length_in_sequence_space();
 
     } else {
-        uint64_t flight_bytes = this->bytes_in_flight();
-        while (!_stream.buffer_empty() && flight_bytes < windows_size) {
+        while (!_stream.buffer_empty() && this->bytes_in_flight() < windows_size) {
             this->start_rto_clock();
 
             TCPSegment s;
-            s.payload() = Buffer(
-                _stream.read(min(TCPConfig::MAX_PAYLOAD_SIZE, static_cast<size_t>(windows_size - flight_bytes))));
+            s.payload() = Buffer(_stream.read(
+                min(TCPConfig::MAX_PAYLOAD_SIZE, static_cast<size_t>(windows_size - this->bytes_in_flight()))));
 
             //得看看有没有FIN信号的位置，这里要注意一点，就是size可以等于TCPConfig::MAX_PAYLOAD_SIZE，因为本来就不占用payload
-            // size，但是不能超过windows size，因为FIN占用一个windows size
-            if (_stream.eof() && s.length_in_sequence_space() < static_cast<size_t>(windows_size - flight_bytes)) {
+            // unassembled_size，但是不能超过windows unassembled_size，因为FIN占用一个windows unassembled_size
+            if (_stream.eof() &&
+                s.length_in_sequence_space() < static_cast<size_t>(windows_size - this->bytes_in_flight())) {
                 s.header().fin = true;
             }
             s.header().seqno = wrap(_next_seqno, _isn);
             _segments_out.push(s);
             _outstanding_node.push(s);
             _next_seqno += s.length_in_sequence_space();
-            flight_bytes += s.length_in_sequence_space();
         }
     }
 }
 
 //! \param ackno The remote receiver's ackno (acknowledgment number)
-//! \param window_size The remote receiver's advertised window size
+//! \param window_size The remote receiver's advertised window unassembled_size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
     uint64_t ackno_u64 = unwrap(ackno, _isn, _stream.bytes_read());
     //没有新东西，或者ack号甚至超过了发送号,直接返回
