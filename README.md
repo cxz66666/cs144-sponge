@@ -1,6 +1,6 @@
-# SPONGE: MIT CS144
+# SPONGE:  CS144
 
-an demo implementation for TCP/IP/Ethernet, repo for learning mit cs144
+an demo implementation for TCP/IP/Ethernet, repo for learning Stanford cs144
 
 性能表现：
 
@@ -111,5 +111,4 @@ installed!)
 
 在我的实现中，通过了所有测试点，除了webget由于wsl2的原因无法进行测试，lab7中的测试运行的非常好，借助cs144.keithw.org本地可以正常进行通信。 以一张图结尾
 ![detail](https://pic.raynor.top/images/2022/01/20/image-20220120225331531.png)
-
 
